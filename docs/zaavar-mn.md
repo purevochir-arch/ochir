@@ -62,7 +62,7 @@ GitHub бол таны бүх ажлын **ухаалаг архив** юм. Ф�
 
 ## 5. Танд нэг удаа хийх 3 зүйл
 
-1. **Pages асаах:** GitHub → `ochir` репо → **Settings → Pages → Source: GitHub Actions** гэж сонгоно.
+1. **Pages асаах:** GitHub → `ochir` репо → **Settings → Pages** — аль хэдийн асаалттай (gh-pages салбараас), юу ч хийх шаардлагагүй.
 2. **Имэйл мэдэгдэл:** GitHub → профайл → **Settings → Notifications → Actions** → "Only failed workflows" асаана.
 3. **Профайлын нүүр хуудас (заавал биш):** `purevochir-arch` нэртэй шинэ репо үүсгэвэл түүний README таны GitHub профайлын нүүрэнд гарна. Үүсгэсний дараа надад хэлээрэй, би бөглөж өгье.
 
