@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Зэсийн флотацийн үйлдвэрийн симулятор — Copper Flotation Plant Simulator</title>
+<style>
+  :root{--bg:#0f1419;--panel:#171e26;--line:#2a3542;--text:#e6edf3;--muted:#8b98a5;--cu:#d98b3a;--water:#4aa3df;--good:#3fb27f;--froth:#c9b48a;}
+  @media (prefers-color-scheme: light){:root{--bg:#f4f6f8;--panel:#fff;--line:#d5dce3;--text:#1b2733;--muted:#5d6b78;--froth:#b59a62;}}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 "Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:18px 24px;border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:20px;font-weight:600}
+  header p{margin:2px 0 0;color:var(--muted);font-size:13px}
+  main{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px 24px}
+  @media (max-width:900px){main{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+  h2{font-size:14px;font-weight:600;margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .ctl{margin-bottom:10px}
+  .ctl label{display:flex;justify-content:space-between;font-size:13px}
+  .ctl output{font-variant-numeric:tabular-nums;color:var(--cu);font-weight:600}
+  input[type=range]{width:100%;accent-color:var(--cu)}
+  button{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+  button:hover{border-color:var(--cu)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:16px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .kpi .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:12px;color:var(--muted)}
+  svg text{font-family:inherit}
+  .stream{fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .flow{stroke-dasharray:6 10;animation:flow 1.4s linear infinite}
+  @keyframes flow{to{stroke-dashoffset:-32}}
+  @media (prefers-reduced-motion: reduce){.flow{animation:none}}
+  .tag rect{fill:var(--panel);stroke:var(--line)}
+  .tag text{font-size:12px;fill:var(--text)}
+  .tag .t2{fill:var(--cu);font-weight:600}
+  .bankname{font-size:13px;font-weight:600;fill:var(--text)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+  @media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+  th,td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  details{margin-top:16px}
+  summary{cursor:pointer;font-weight:600}
+  .explain p{margin:.5em 0}
+  .sig{color:var(--muted);font-size:12px;text-align:right;padding:0 24px 16px}
+  .warn{color:#e5534b;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Зэсийн флотацийн үйлдвэрийн симулятор <span style="color:var(--muted);font-weight:400">· Copper Flotation Plant</span></h1>
+  <p>Rougher – Scavenger – Cleaner хэлхээ, эргэлтийн урсгалтай · МГТИС, Эрдэс баялаг, хүрээлэн буй орчны инженерчлэлийн факультет</p>
+</header>
+<main>
+  <aside class="panel" id="controls">
+    <h2>Оролт · Inputs</h2>
+    <div id="sliders"></div>
+    <button id="reset" type="button">Анхны утга · Reset</button>
+  </aside>
+  <section>
+    <div class="kpis" id="kpis"></div>
+    <div class="panel">
+      <h2>Технологийн схем · Flowsheet (t/h, % Cu)</h2>
+      <svg id="flowsheet" viewBox="0 0 1000 330" width="100%" role="img" aria-label="Flotation flowsheet"></svg>
+      <div id="warn" class="warn"></div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Агуулга – авалтын муруй · Grade–recovery (rougher time sweep)</h2>
+        <svg id="chart" viewBox="0 0 520 300" width="100%"></svg>
+      </div>
+      <div class="panel">
+        <h2>Урсгалын баланс · Stream table</h2>
+        <table id="table"></table>
+      </div>
+    </div>
+    <details class="panel explain">
+      <summary>Загварын тайлбар · Model explanation</summary>
+      <p><b>Кинетик.</b> Флотацийг нэгдүгээр эрэмбийн кинетикээр загварчилсан. Дараалан холбогдсон N ширхэг бүрэн холилттой камерт авалт R = 1 − (1 + kτ)<sup>−N</sup>, энд τ = t/N нь нэг камерын дундаж байх хугацаа.</p>
+      <p><b>Ашигт эрдэс.</b> Халькопирит (CuFeS₂, 34.6 % Cu) хурдан хөвдөг, удаан хөвдөг болон хөвдөггүй (уулзвар ороогүй) гэсэн гурван фракцад хуваагдана. Хоосон чулуулаг (gangue) хөөсөнд механикаар зөөгдөх (entrainment) жижиг хурдны тогтмолоор илэрхийлэгдэнэ.</p>
+      <p><b>Хэлхээ.</b> Цэвэрлэгээний хаягдал ба хяналтын баяжмал үндсэн флотацийн тэжээл рүү эргэн орно. Эргэлтийн урсгалыг давталтын аргаар (fixed-point iteration) нийлэх хүртэл бодно; хатуу бодис болон зэсийн баланс 10⁻⁹ t/h нарийвчлалтай битүүрнэ.</p>
+      <p><b>Орлого.</b> Баяжмал дахь зэс × төлбөрт хувь × үнэ (TC/RC, тээвэргүй) — NSR-ийн дээд хязгаарын үнэлгээ.</p>
+      <p lang="en"><i>First-order kinetics in N tanks-in-series; three-class mineral floatability; recycle solved by fixed-point iteration; mass balance closes to 1e-9 t/h.</i></p>
+    </details>
+  </section>
+</main>
+<div class="sig">— Nora · Ochir's AI team · v1.0</div>
+<script src="./model.js"></script>
+<script>
+(function(){
+  'use strict';
+  var M = window.FlotationModel;
+  var SL = [
+    ['feedTph','Тэжээл · Feed','t/h',500,4000,50],
+    ['headCu','Анхдагч агуулга · Head grade','% Cu',0.2,1.5,0.01],
+    ['fastFrac','Хурдан хөвөгч хэсэг · Fast fraction','–',0.3,0.9,0.01],
+    ['slowFrac','Удаан хөвөгч хэсэг · Slow fraction','–',0.05,0.5,0.01],
+    ['kFast','k хурдан · k fast','1/min',0.3,3,0.05],
+    ['kSlow','k удаан · k slow','1/min',0.02,0.5,0.01],
+    ['kGangueRough','k хоосон (үндсэн) · k gangue rougher','1/min',0.001,0.05,0.001],
+    ['kGangueClean','k хоосон (цэвэрлэгээ) · k gangue cleaner','1/min',0.0005,0.02,0.0005],
+    ['tRougher','Үндсэн флотаци · Rougher time','min',2,30,0.5],
+    ['tScav','Хяналтын флотаци · Scavenger time','min',0,30,0.5],
+    ['tCleaner','Цэвэрлэгээ · Cleaner time','min',2,30,0.5],
+    ['nRougher','Үндсэн камер · Rougher cells','pcs',1,12,1],
+    ['nScav','Хяналтын камер · Scavenger cells','pcs',1,12,1],
+    ['nCleaner','Цэвэрлэгээний камер · Cleaner cells','pcs',1,12,1],
+    ['cuPrice','Зэсийн үнэ · Cu price','USD/t',6000,14000,100]
+  ];
+  var state = Object.assign({}, M.DEFAULTS);
+  var box = document.getElementById('sliders');
+
+  function dec(step){ var s=String(step); return s.indexOf('.')<0?0:s.split('.')[1].length; }
+  function buildSliders(){
+    box.innerHTML='';
+    SL.forEach(function(d){
+      var w=document.createElement('div'); w.className='ctl';
+      w.innerHTML='<label for="s_'+d[0]+'"><span>'+d[1]+'</span><output id="o_'+d[0]+'"></output></label>'+
+        '<input type="range" id="s_'+d[0]+'" min="'+d[3]+'" max="'+d[4]+'" step="'+d[5]+'" value="'+state[d[0]]+'">';
+      box.appendChild(w);
+      var inp=w.querySelector('input'), out=w.querySelector('output');
+      out.textContent=Number(state[d[0]]).toFixed(dec(d[5]))+' '+d[2];
+      inp.addEventListener('input',function(){ state[d[0]]=Number(inp.value); out.textContent=Number(inp.value).toFixed(dec(d[5]))+' '+d[2]; render(); });
+    });
+  }
+  document.getElementById('reset').addEventListener('click',function(){ state=Object.assign({},M.DEFAULTS); buildSliders(); render(); });
+
+  function f(x,d){ return Number(x).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+  var NS='http://www.w3.org/2000/svg';
+  function el(tag,attrs,parent,text){ var e=document.createElementNS(NS,tag); for(var k in attrs) e.setAttribute(k,attrs[k]); if(text!==undefined) e.textContent=text; if(parent) parent.appendChild(e); return e; }
+
+  function bank(svg,x,y,w,n,name,sub){
+    var cw=w/n, h=66;
+    el('text',{x:x,y:y-8,'class':'bankname'},svg,name);
+    el('text',{x:x+w,y:y-8,'text-anchor':'end','font-size':11,fill:'var(--muted)'},svg,sub);
+    for(var i=0;i<n;i++){
+      var cx=x+i*cw;
+      el('rect',{x:cx+2,y:y,width:cw-4,height:h,rx:3,fill:'url(#pulp)',stroke:'var(--line)'},svg);
+      el('rect',{x:cx+2,y:y,width:cw-4,height:12,rx:3,fill:'url(#froth)'},svg);
+      el('line',{x1:cx+cw/2,y1:y-4,x2:cx+cw/2,y2:y+h-14,stroke:'var(--muted)','stroke-width':1.5},svg);
+      el('rect',{x:cx+cw/2-7,y:y+h-16,width:14,height:5,rx:1,fill:'var(--muted)'},svg);
+    }
+    el('rect',{x:x,y:y+h,width:w,height:4,fill:'var(--froth)',opacity:.8},svg); // launder
+  }
+  function stream(svg,pts,tph,color,maxT){
+    var d='M'+pts.map(function(p){return p.join(',');}).join(' L');
+    var wpx=1.5+5*Math.sqrt(Math.max(0,tph)/maxT);
+    el('path',{d:d,'class':'stream',stroke:color,'stroke-width':wpx,opacity:.35},svg);
+    el('path',{d:d,'class':'stream flow',stroke:color,'stroke-width':Math.max(1.2,wpx*0.5)},svg);
+    var a=pts[pts.length-1], b=pts[pts.length-2], ang=Math.atan2(a[1]-b[1],a[0]-b[0]);
+    var s=7; el('path',{d:'M'+a[0]+','+a[1]+' L'+(a[0]-s*Math.cos(ang-0.5))+','+(a[1]-s*Math.sin(ang-0.5))+' L'+(a[0]-s*Math.cos(ang+0.5))+','+(a[1]-s*Math.sin(ang+0.5))+'Z',fill:color},svg);
+  }
+  function tag(svg,x,y,title,s){
+    var g=el('g',{'class':'tag',transform:'translate('+x+','+y+')'},svg);
+    el('rect',{x:0,y:0,width:118,height:40,rx:4},g);
+    el('text',{x:6,y:15},g,title);
+    el('text',{x:6,y:32,'class':'t2'},g,f(s.tph,s.tph<100?2:0)+' t/h · '+f(s.cuPct,s.cuPct<1?3:2)+' %');
+  }
+
+  function drawFlowsheet(r){
+    var svg=document.getElementById('flowsheet'); svg.innerHTML='';
+    var defs=el('defs',{},svg);
+    var g1=el('linearGradient',{id:'pulp',x1:0,y1:0,x2:0,y2:1},defs);
+    el('stop',{offset:'0','stop-color':'#5b6670'},g1); el('stop',{offset:'1','stop-color':'#2f363d'},g1);
+    var g2=el('linearGradient',{id:'froth',x1:0,y1:0,x2:0,y2:1},defs);
+    el('stop',{offset:'0','stop-color':'#e0c98f'},g2); el('stop',{offset:'1','stop-color':'#9c7f45'},g2);
+    var p=r.params, S=r.streams, maxT=r.streams.rougherFeed.tph;
+    var cu='var(--cu)', pulp='var(--water)', mute='var(--muted)';
+    // feed + mixer
+    stream(svg,[[10,190],[78,190]],S.fresh.tph,pulp,maxT);
+    el('circle',{cx:90,cy:190,r:10,fill:'var(--panel)',stroke:'var(--muted)'},svg);
+    stream(svg,[[100,190],[138,190]],S.rougherFeed.tph,pulp,maxT);
+    // banks
+    bank(svg,140,160,300,p.nRougher,'Үндсэн · Rougher',f(p.tRougher,1)+' min');
+    bank(svg,540,160,280,p.nScav,'Хяналтын · Scavenger',f(p.tScav,1)+' min');
+    bank(svg,330,40,240,p.nCleaner,'Цэвэрлэгээ · Cleaner',f(p.tCleaner,1)+' min');
+    // rougher conc -> cleaner
+    stream(svg,[[300,160],[300,128],[600,128],[600,90],[574,90]],S.rougherConc.tph,cu,maxT);
+    // rougher tail -> scavenger
+    stream(svg,[[440,205],[536,205]],S.rougherTail.tph,pulp,maxT);
+    // cleaner conc -> final conc
+    stream(svg,[[570,60],[860,60]],S.concentrate.tph,cu,maxT);
+    // cleaner tail -> recycle
+    stream(svg,[[330,80],[90,80],[90,178]],S.cleanerTail.tph,mute,maxT);
+    // scav conc -> recycle
+    stream(svg,[[680,230],[680,290],[90,290],[90,202]],S.scavConc.tph,mute,maxT);
+    // scav tail -> tailings
+    stream(svg,[[820,205],[960,205]],S.tailings.tph,pulp,maxT);
+    tag(svg,6,215,'Тэжээл · Feed',S.fresh);
+    tag(svg,868,40,'Баяжмал · Conc.',S.concentrate);
+    tag(svg,868,215,'Хаягдал · Tails',S.tailings);
+    tag(svg,610,96,'Үндсэн баяж. · RC',S.rougherConc);
+    tag(svg,130,92,'Цэвэрл. хаяг. · CT',S.cleanerTail);
+    tag(svg,700,252,'Хяналт баяж. · SC',S.scavConc);
+    tag(svg,446,232,'Үндсэн хаяг. · RT',S.rougherTail);
+  }
+
+  function drawKpis(r){
+    var k=r.kpi, items=[
+      ['Баяжмалын агуулга · Conc. grade',f(k.concGrade,2)+' % Cu'],
+      ['Зэсийн авалт · Cu recovery',f(k.recovery,2)+' %'],
+      ['Масс гарц · Mass pull',f(k.massPull,2)+' %'],
+      ['Баяжуулалтын зэрэг · Enrichment',f(k.enrichment,1)+' ×'],
+      ['Хаягдлын агуулга · Tail grade',f(k.tailGrade,3)+' % Cu'],
+      ['Эргэлтийн ачаалал · Circ. load',f(k.circulatingLoad,1)+' %'],
+      ['Орлого · Payable Cu value',f(k.revenueUsdPerHour/1000,1)+' k USD/h']
+    ];
+    document.getElementById('kpis').innerHTML=items.map(function(i){return '<div class="kpi"><div class="v">'+i[1]+'</div><div class="l">'+i[0]+'</div></div>';}).join('');
+    document.getElementById('warn').textContent = r.converged ? '' : 'Анхааруулга: эргэлтийн урсгал нийлээгүй · recycle did not converge';
+    if(state.fastFrac+state.slowFrac>1) document.getElementById('warn').textContent='Хурдан + удаан хэсэг 1-ээс их байна · fast + slow fraction > 1';
+  }
+
+  function drawTable(r){
+    var rows=[['Тэжээл · Feed','fresh'],['Үндсэн тэжээл · Rougher feed','rougherFeed'],['Үндсэн баяжмал · Rougher conc','rougherConc'],['Үндсэн хаягдал · Rougher tail','rougherTail'],['Цэвэрлэгээний хаягдал · Cleaner tail','cleanerTail'],['Хяналтын баяжмал · Scav conc','scavConc'],['Эцсийн баяжмал · Final conc','concentrate'],['Эцсийн хаягдал · Final tails','tailings']];
+    var cuFeed=r.streams.fresh.cuTph;
+    var h='<tr><th>Урсгал · Stream</th><th>t/h</th><th>% Cu</th><th>Cu t/h</th><th>Cu dist. %</th></tr>';
+    rows.forEach(function(x){ var s=r.streams[x[1]]; h+='<tr><td>'+x[0]+'</td><td>'+f(s.tph,1)+'</td><td>'+f(s.cuPct,3)+'</td><td>'+f(s.cuTph,3)+'</td><td>'+f(100*s.cuTph/cuFeed,1)+'</td></tr>'; });
+    h+='<tr><td>Балансын алдаа · Balance error</td><td colspan="4">'+r.kpi.balanceErrorTph.toExponential(1)+' t/h</td></tr>';
+    document.getElementById('table').innerHTML=h;
+  }
+
+  function drawChart(r){
+    var svg=document.getElementById('chart'); svg.innerHTML='';
+    var c=M.gradeRecoveryCurve(state,2,30,40), L=50,R=500,T=15,B=260;
+    var gmin=Infinity,gmax=-Infinity,rmin=Infinity,rmax=-Infinity;
+    c.forEach(function(p){gmin=Math.min(gmin,p.grade);gmax=Math.max(gmax,p.grade);rmin=Math.min(rmin,p.recovery);rmax=Math.max(rmax,p.recovery);});
+    rmin=Math.floor(rmin-1); rmax=Math.min(100,Math.ceil(rmax+1)); gmin=Math.floor(gmin-1); gmax=Math.ceil(gmax+1);
+    function X(v){return L+(R-L)*(v-rmin)/(rmax-rmin);} function Y(v){return B-(B-T)*(v-gmin)/(gmax-gmin);}
+    for(var i=0;i<=5;i++){
+      var rv=rmin+(rmax-rmin)*i/5, gv=gmin+(gmax-gmin)*i/5;
+      el('line',{x1:X(rv),y1:T,x2:X(rv),y2:B,stroke:'var(--line)'},svg);
+      el('text',{x:X(rv),y:B+16,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},svg,f(rv,1));
+      el('line',{x1:L,y1:Y(gv),x2:R,y2:Y(gv),stroke:'var(--line)'},svg);
+      el('text',{x:L-6,y:Y(gv)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'},svg,f(gv,1));
+    }
+    el('text',{x:(L+R)/2,y:292,'text-anchor':'middle','font-size':12,fill:'var(--muted)'},svg,'Cu авалт · recovery, %');
+    el('text',{x:14,y:(T+B)/2,'text-anchor':'middle','font-size':12,fill:'var(--muted)',transform:'rotate(-90 14 '+(T+B)/2+')'},svg,'Агуулга · grade, % Cu');
+    el('path',{d:'M'+c.map(function(p){return X(p.recovery)+','+Y(p.grade);}).join(' L'),fill:'none',stroke:'var(--cu)','stroke-width':2.5},svg);
+    var k=r.kpi; el('circle',{cx:X(k.recovery),cy:Y(k.concGrade),r:6,fill:'var(--good)',stroke:'var(--panel)','stroke-width':2},svg);
+    var nearR=X(k.recovery)>R-150; el('text',{x:X(k.recovery)+(nearR?-9:9),y:Y(k.concGrade)-8,'text-anchor':nearR?'end':'start','font-size':12,fill:'var(--text)'},svg,'одоогийн · current ('+f(state.tRougher,1)+' min)');
+  }
+
+  function render(){ var r=M.simulate(state); drawKpis(r); drawFlowsheet(r); drawTable(r); drawChart(r); window.__lastResult=r; }
+  buildSliders(); render();
+})();
+</script>
+</body>
+</html>
