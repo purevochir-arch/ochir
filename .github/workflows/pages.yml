@@ -15,7 +15,7 @@ jobs:
       - name: Tests must pass before going live
         run: npm test
       - run: mkdir -p _site && cp -r index.html simulators _site/
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v3
         with: { path: _site }
       - id: d
