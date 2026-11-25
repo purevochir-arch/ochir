@@ -16,7 +16,7 @@ jobs:
         run: npm test
       - run: mkdir -p _site && cp -r index.html simulators _site/
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with: { path: _site }
       - id: d
         uses: actions/deploy-pages@v4
